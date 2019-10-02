@@ -46,6 +46,7 @@ public class ChunkAnalyisisCommandExecutor implements CommandExecutor {
         addCommandHandler("count", new CountCommand(Permission.USE));
         addCommandHandler("cancel", new CancelCommand(Permission.USE));
         addCommandHandler("help", new HelpCommand(Permission.USE));
+        addCommandHandler("config", new ConfigCommand(Permission.USE));
     }
     
     @Override

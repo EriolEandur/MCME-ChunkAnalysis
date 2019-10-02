@@ -20,9 +20,12 @@ package com.mcmiddleearth.chunkanalysis.job.action;
 
 import com.mcmiddleearth.chunkanalysis.ChunkAnalysis;
 import com.mcmiddleearth.resourceregions.DevUtil;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 
@@ -30,22 +33,25 @@ import org.bukkit.block.BlockState;
  *
  * @author Eriol_Eandur
  */
-public class JobActionReplace extends JobAction {
+public class JobActionQuickReplace extends JobAction {
     
     private final int[][] searchBlocks;
     
     private final int[][] replaceBlocks;
     
+    private final Map<Mask,int[]> replacements = new HashMap<>();
+    
     private Set<BlockState> pendingUpdates = new HashSet<>();
     //private Set<Chunk> pendingChunks = new HashSet<>();
     
-    public JobActionReplace(int[][] searchBlocks, int[][] replaceBlocks) {
+    public JobActionQuickReplace(int[][] searchBlocks, int[][] replaceBlocks) {
         super(0, 0);
         this.searchBlocks=searchBlocks;
         this.replaceBlocks=replaceBlocks;
+        createReplacements();
     }
     
-    public JobActionReplace(int[][] blockData, long processed, long found) {
+    public JobActionQuickReplace(int[][] blockData, long processed, long found) {
         super(processed, found);
 //Logger.getGlobal().info("replace");
 //for(int i=0;i<blockData.length;i++) {
@@ -56,38 +62,45 @@ public class JobActionReplace extends JobAction {
         System.arraycopy(blockData, 0, searchBlocks, 0, blockData.length/2);
         System.arraycopy(blockData, blockData.length/2, replaceBlocks, 0, blockData.length/2);
         DevUtil.log("Search for "+ searchBlocks.length+" blocks ");
+        createReplacements();
+    }
+    
+    private void createReplacements() {
+        replacements.clear();
+        for(int i=0;i<searchBlocks.length;i++) {
+            replacements.put(new Mask(searchBlocks[i][0],searchBlocks[i][1]),replaceBlocks[i]);
+        }
     }
     
     @Override
     public void execute(Block block) {
         super.execute(block);
-        for(int i=0;i< searchBlocks.length;i++) {
-            int[] blockData = searchBlocks[i];
-            if(block.getTypeId()==blockData[0] 
-                    && (blockData[1] == -1 || block.getData()== blockData[1]) ) {
-                int[] replaceData = replaceBlocks[i];
-                final BlockState state = block.getState();
-                byte dv = state.getRawData();
-                state.setTypeId(replaceData[0]);
-                if(replaceData[1]>=0) {
-                    state.setRawData((byte) replaceData[1]);
-                } else {
-                    state.setRawData(dv);
-                }
-                try{
-                    state.update(true, false);
-                    if(ChunkAnalysis.needsDoubleUpdate(state)) {
-                        pendingUpdates.add(state);
-                        //if(!pendingChunks.contains(state.getChunk())) {
-                        //    pendingChunks.add(state.getChunk());    
-                        //}
-                    }
-                } catch(NullPointerException e) {
-                    Logger.getGlobal().info("NULL: "+state.getX()+" "+state.getY()+" "+state.getZ()+" "+state.getType()+" "+state.getRawData());
-                }
-                foundBlocks++;
-                break;
+        //for(int i=0;i< searchBlocks.length;i++) {
+        //    int[] blockData = searchBlocks[i];
+        //    if(block.getTypeId()==blockData[0] 
+        //            && (blockData[1] == -1 || block.getData()== blockData[1]) ) {
+        final BlockState state = block.getState();
+        int[] replaceData = replacements.get(new Mask(state.getTypeId(),state.getRawData()));
+        if(replaceData!=null) {
+            byte dv = state.getRawData();
+            state.setTypeId(replaceData[0]);
+            if(replaceData[1]>=0) {
+                state.setRawData((byte) replaceData[1]);
+            } else {
+                state.setRawData(dv);
             }
+            try{
+                state.update(true, false);
+                if(ChunkAnalysis.needsDoubleUpdate(state)) {
+                    pendingUpdates.add(state);
+                    //if(!pendingChunks.contains(state.getChunk())) {
+                    //    pendingChunks.add(state.getChunk());    
+                    //}
+                }
+            } catch(NullPointerException e) {
+                Logger.getGlobal().info("NULL: "+state.getX()+" "+state.getY()+" "+state.getZ()+" "+state.getType()+" "+state.getRawData());
+            }
+            foundBlocks++;
         }
     }
     
@@ -181,4 +194,37 @@ public class JobActionReplace extends JobAction {
         return result;
     }
 
+    class Mask {
+        
+        private final int searchID;
+        private final int searchDV;
+                
+        
+        public Mask(int searchID, int searchDV) {
+            this.searchID = searchID;
+            this.searchDV = searchDV;
+        }
+          
+        @Override
+        public boolean equals(Object compare) {
+            if(!(compare instanceof Mask)) {
+                return false;
+            }
+            Mask other = (Mask) compare;
+            return (other.searchID==searchID 
+                    && (other.searchDV == -1 || other.searchDV == searchDV) );
+//            if(other.searchID == searchID) 
+//Logger.getGlobal().info(""+searchID+" "+searchDV+" "+other.searchID+" "+other.searchDV+" "+result);
+//            return result;
+        }
+
+        @Override
+        public int hashCode() {
+            //int hash = 7;this.ha
+            //hash = 31 * hash + this.searchID;
+            return this.searchID;//hash
+        }
+
+
+    }
 }

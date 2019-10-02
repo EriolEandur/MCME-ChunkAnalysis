@@ -5,7 +5,7 @@
  */
 package com.mcmiddleearth.chunkanalysis;
 
-import com.mcmiddleearth.chunkanalysis.job.CuboidJob;
+//import com.mcmiddleearth.chunkanalysis.job.CuboidJob;
 import com.mcmiddleearth.chunkanalysis.job.action.JobActionReplace;
 import com.mcmiddleearth.chunkanalysis.util.DevUtil;
 import com.sk89q.worldedit.bukkit.WorldEditPlugin;
@@ -399,7 +399,7 @@ Logger.getGlobal().info("3");
                     int[][] data = new int[][]{{Integer.parseInt(args.get(1)),-1},{
                                                                    Integer.parseInt(args.get(2)),-1}};
                     JobActionReplace action = new JobActionReplace(data,0,0);
-                    JobManager.addJob(new CuboidJob(((Player)sender).getUniqueId(),(CuboidSelection)sel,action));
+                    //JobManager.addJob(new CuboidJob(((Player)sender).getUniqueId(),(CuboidSelection)sel,action));
                     MessageManager.addListeningPlayer(((Player)sender).getUniqueId());
                     return true;
                     /*r = new Runnable(){

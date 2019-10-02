@@ -26,12 +26,15 @@ import com.mcmiddleearth.pluginutil.message.MessageUtil;
 import com.sk89q.worldedit.bukkit.WorldEditPlugin;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import lombok.Getter;
 import me.dags.resourceregions.region.RegionManager;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.block.BlockState;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.plugin.PluginManager;
@@ -59,6 +62,8 @@ public class ChunkAnalysis extends JavaPlugin {
     
     @Getter
     private final static MessageUtil messageUtil = new MessageUtil();
+    
+    private static List<Integer> doubleUpdateBlocks = new ArrayList<>();
     
     @Override
     public void onEnable(){
@@ -95,6 +100,7 @@ public class ChunkAnalysis extends JavaPlugin {
         }
         this.saveDefaultConfig();
         JobManager.init(config.getInt("tps",15));
+        loadConfig();
     }
     
     @Override
@@ -134,5 +140,27 @@ public class ChunkAnalysis extends JavaPlugin {
         return new Vector(NumericUtil.getInt(coords[0]),
                           0,
                           NumericUtil.getInt(coords[1]));
+    }
+    
+    public static boolean needsDoubleUpdate(BlockState state) {
+        for(Integer type: doubleUpdateBlocks) {
+            if(type == state.getTypeId()) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    public void loadConfig() {
+        doubleUpdateBlocks = this.getConfig().getIntegerList("doubleUpdateBlocks");
+        if(doubleUpdateBlocks == null) {
+            doubleUpdateBlocks = new ArrayList<>();
+        }
+        JobManager.setTps(this.getConfig().getInt("tps",15));
+        
+    }
+    
+    public static void reloadConfiguration() {
+        ((ChunkAnalysis)ChunkAnalysis.getInstance()).loadConfig();
     }
 }

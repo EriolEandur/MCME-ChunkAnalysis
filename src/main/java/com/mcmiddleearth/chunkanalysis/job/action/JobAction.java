@@ -18,8 +18,11 @@
  */
 package com.mcmiddleearth.chunkanalysis.job.action;
 
+import java.util.HashSet;
+import java.util.Set;
 import lombok.Getter;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
 
 /**
  *
@@ -51,4 +54,18 @@ public abstract class JobAction {
     public abstract String getName();
     
     public abstract String getDetails();
+    
+    protected void schedulePendingUpdates() {
+    }
+    
+    public boolean hasPendingUpdates() {
+        return false;
+    }
+    
+    public void clearPendingUpdates(){}
+    
+    public Set<BlockState> getPendingUpdates() {
+        return new HashSet<BlockState>();
+    }
+    
 }

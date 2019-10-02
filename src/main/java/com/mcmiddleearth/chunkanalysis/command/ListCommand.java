@@ -45,7 +45,7 @@ public class ListCommand extends AbstractCommand {
     
     @Override
     protected void execute(CommandSender cs, String... args) {
-        if(args.length>0 && args[0].equalsIgnoreCase("message")) {
+        if(args.length>0 && args[0].equalsIgnoreCase("messages")) {
             int page = 1;
             if(args.length>1 && NumericUtil.isInt(args[1])) {
                 page = NumericUtil.getInt(args[1]);

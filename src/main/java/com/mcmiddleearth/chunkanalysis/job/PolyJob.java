@@ -24,13 +24,17 @@ import com.mcmiddleearth.chunkanalysis.util.DBUtil;
 import com.sk89q.worldedit.BlockVector2D;
 import com.sk89q.worldedit.bukkit.selections.Polygonal2DSelection;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.BlockState;
 import org.bukkit.util.Vector;
 
 /**
@@ -43,6 +47,8 @@ public final class PolyJob extends Job {
     private final Vector maxCorner;
     
     private final List<Polygonal2DSelection> regions;
+    
+    private Map<Chunk,Set<BlockState>> pendingUpdates = new HashMap<>();
   
     private boolean finished=false;
     
@@ -134,7 +140,8 @@ public final class PolyJob extends Job {
     protected void executeTask(final int taskSize) {
         DevUtil.log(6,"start poly job task current "+currentChunk.getBlockX()+" "+currentChunk.getBlockZ());
         int chunksDoneStart = chunksDone;
-        int chunkCounter = 0;
+        int chunkCounter = pendingUpdates.size();
+        handlePendingUpdates();
         while(chunkCounter<taskSize) {
             for(Polygonal2DSelection region: regions) {
                 Location currentLocation = new Location(world,currentChunk.getBlockX()*16,
@@ -147,10 +154,9 @@ public final class PolyJob extends Job {
                     if(handleChunk(x,z,
                                    region.getMinimumPoint().getBlockY(),
                                    region.getMaximumPoint().getBlockY())) {
-                        DBUtil.logChunk(this,x,z,0,0,0, getAction().getProcessedBlocks(),
-                                                        getAction().getFoundBlocks());
+                        //DBUtil.logChunk(this,x,z,0,0,0, getAction().getProcessedBlocks(),
+                        //                                getAction().getFoundBlocks());
                     } else {
-                        getAction().saveResults(getId());
                         return;
                     }
                     chunksDone++;
@@ -166,7 +172,7 @@ public final class PolyJob extends Job {
             }
             currentChunk = nextCurrent(currentChunk);
         }
-        getAction().saveResults(getId());
+        //getAction().saveResults(getId());
         //currentChunk = nextCurrent(lastFinished);
         DevUtil.log(6,"end job task done chunks: "+(chunksDone-chunksDoneStart));
         DevUtil.log(6,"end job task next current "+currentChunk.getBlockX()+" "+currentChunk.getBlockZ());
@@ -178,12 +184,22 @@ public final class PolyJob extends Job {
                                                                    minY);
         int startZ = currentBlock.getBlockZ();
         for(int x = currentBlock.getBlockX(); x<16;x++) {
+            currentBlock.setX(x);
             for(int z=startZ; z<16;z++) {
+                currentBlock.setZ(z);
                 for(int y=startY;y<=maxY;y++) {
+                    currentBlock.setY(y);
                     if(taskCancelled) {
-                        DBUtil.logBlock(this,x,y,z, getAction().getProcessedBlocks(),
-                                                    getAction().getFoundBlocks());
-                        currentBlock = new Vector(x,y,z);
+                        if(saveProgress) {
+                            saveProgress(); 
+                            saveProgress = false;
+                        }
+                        //DBUtil.logChunk(this,chunkX,chunkZ,x,y,z, getAction().getProcessedBlocks(),
+                        //                                getAction().getFoundBlocks());
+                        //getAction().saveResults(getId());
+                        //DBUtil.logBlock(this,x,y,z, getAction().getProcessedBlocks(),
+                        //                            getAction().getFoundBlocks());
+                        //currentBlock = new Vector(x,y,z);
                         return false;
                     } 
                     action.execute(chunk.getBlock(x, y, z));
@@ -194,14 +210,37 @@ public final class PolyJob extends Job {
         }
         //DBUtil.logBlock(this, x, y, z);
         currentBlock = new Vector(0,0,0);
+        if(action.hasPendingUpdates()) {
+            pendingUpdates.put(chunk, action.getPendingUpdates());
+            action.clearPendingUpdates();
+        } else {
+            unloadChunk(chunk);
+        }
+        return true;
+    }
+    
+    @Override
+    protected void handlePendingUpdates() {
+        for(Chunk chunk:pendingUpdates.keySet()) {
+            Set<BlockState> blockStates = pendingUpdates.get(chunk);
+            for(BlockState state:blockStates) {
+                state.update(true, false);
+            }
+            unloadChunk(chunk);
+        }
+        pendingUpdates = new HashMap<>();
+    }
+    
+    private void unloadChunk(Chunk chunk) {
         if(!world.unloadChunk(chunk)) {
             DevUtil.log(4,"Unable to unload chunk directly");
+            int x = chunk.getX();
+            int z = chunk.getZ();
             chunk = null;
-            if(!world.unloadChunkRequest(chunkX, chunkZ)) {
+            if(!world.unloadChunkRequest(x, z)) {
                 DevUtil.log(4,"Unable to queue unload chunk");
             }
         }
-        return true;
     }
     
     private Vector nextCurrent(Vector lastFinished) {

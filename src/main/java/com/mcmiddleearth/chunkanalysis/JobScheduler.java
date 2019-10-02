@@ -40,6 +40,8 @@ public class JobScheduler extends BukkitRunnable {
         
     private final int START_TASK_SIZE = 1;
     
+    private final int MAX_TASK_SIZE = 10;
+    
     @Setter
     float i = 0;
     @Setter
@@ -95,7 +97,7 @@ public class JobScheduler extends BukkitRunnable {
                 tps.add(tpsNew);
                 DevUtil.log(2,"averaged tps: "+tps.getAverage()+" set tps: "+tps.getDesired());
                 if(suspended || recovery) {
-                    pendingJobs.get(0).stopTask();
+                    pendingJobs.get(0).stopTask(true);
                 } else {
                     if(!pendingJobs.get(0).isTaskPending()) {
                         if(pendingJobs.get(0).isFinished()) {
@@ -111,25 +113,30 @@ public class JobScheduler extends BukkitRunnable {
                                 break;
                             }
                         }
-                        taskSize = START_TASK_SIZE;
-                        pendingJobs.get(0).setTaskSize(taskSize);
-                        pendingJobs.get(0).startTask();
-                        DevUtil.log("job started");
-                        MessageManager.sendJobStarted(pendingJobs.get(0));
-                        tps.reset(tps.getDesired());
+                        if(pendingJobs.get(0).isPrepared()) {
+                            taskSize = START_TASK_SIZE;
+                            pendingJobs.get(0).setTaskSize(taskSize);
+                            pendingJobs.get(0).startTask();
+                            DevUtil.log("job started");
+                            MessageManager.sendJobStarted(pendingJobs.get(0));
+                            tps.reset(tps.getDesired());
+                        }
                     } else {
                         if(tps.getAverage()<10) {
                             taskSize = taskSize / 2;
+                            recovery= true;
+                            pendingJobs.get(0).stopTask(true);
                         } else {
                             taskSize = calculateTaskSize(taskSize);
                         }
                         taskSize = Math.max(0.3f, taskSize);
                         pendingJobs.get(0).setTaskSize(taskSize);
+                        pendingJobs.get(0).saveProgress();//0,0,0,false);
                         DevUtil.log(2,"current task size: "+taskSize);
                     }
                 }
                 if(cancel) {
-                    pendingJobs.get(0).stopTask();
+                    pendingJobs.get(0).stopTask(false);
                     pendingJobs.get(0).clearJobData();
                     UUID owner = pendingJobs.get(0).getOwner();
                     MessageManager.sendJobCancelled(pendingJobs.get(0));
@@ -147,7 +154,7 @@ public class JobScheduler extends BukkitRunnable {
                 DevUtil.log(3,"Dt: "+(currentTime-lastTime));
                 if(logTime<currentTime-10000) {
                     double serverTps = (currentTickCounter-logTicks)/((currentTime-logTime)/1000.0);
-                    recovery = serverTps < tps.getAverage()-4 || serverTps < 5;
+                    recovery = serverTps < tps.getAverage()-4 || serverTps < 10;
                     MessageManager.sendCurrentJobStatus(pendingJobs.get(0));
 
                     DevUtil.log("***");
@@ -161,7 +168,7 @@ public class JobScheduler extends BukkitRunnable {
                     DevUtil.log("Working at coord: "+pendingJobs.get(0).getCurrentChunk().getBlockX()*16+" "
                                                     +pendingJobs.get(0).getCurrentChunk().getBlockZ()*16);
                     DevUtil.log("Done "+Math.min(100,(pendingJobs.get(0).getChunksDone()*100.0/pendingJobs.get(0).getJobSize()))+"%");
-                    if(recovery) {
+                    /*if(recovery) {
                         DevUtil.log("Saving world...");
                         final World world = pendingJobs.get(0).getWorld();
                         new BukkitRunnable() {
@@ -170,7 +177,7 @@ public class JobScheduler extends BukkitRunnable {
                                 world.save();
                             }
                         }.runTask(ChunkAnalysis.getInstance());
-                    }
+                    }*/
                     logProcessedBlocks = pendingJobs.get(0).getAction().getProcessedBlocks();
                     logTime=currentTime;
                     logTicks = currentTickCounter;
@@ -178,7 +185,7 @@ public class JobScheduler extends BukkitRunnable {
                 lastTickCounter = currentTickCounter;
                 lastTime = currentTime;
                 try {
-                    Thread.sleep(1000);
+                    Thread.sleep(2000);
                 } catch (InterruptedException ex) {
                     Logger.getLogger(JobScheduler.class.getName()).log(Level.SEVERE, null, ex);
                 }
@@ -186,7 +193,8 @@ public class JobScheduler extends BukkitRunnable {
         }
         finally {
             if(pendingJobs.size()>0) {
-                pendingJobs.get(0).stopTask();
+                pendingJobs.get(0).stopTask(true);
+                //pendingJobs.get(0).saveProgress();
             }
             disable = false;
             ticker.cancel();
@@ -205,6 +213,9 @@ public class JobScheduler extends BukkitRunnable {
         taskSize = taskSize+diff;
         if(taskSize<0) {
             taskSize=0;
+        }
+        if(taskSize>MAX_TASK_SIZE) {
+            taskSize = MAX_TASK_SIZE;
         }
         return taskSize;
     }

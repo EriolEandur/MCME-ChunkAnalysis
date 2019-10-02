@@ -22,3 +22,8 @@ worlds:
   moria:
     minBlock: -10000,-10000
     maxBlock: -2000,-2000
+
+# block configuration
+# some block changes need a second update after one server tick
+doubleUpdateBlocks:
+    - 158

@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
+import lombok.Setter;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -42,10 +43,12 @@ public class JobManager {
     @Getter
     private static List<Job> pendingJobs = new ArrayList<>();
     
+    @Setter
     private static int tps;
     
     public static void init(int setTps) {
         tps = setTps;
+//Logger.getGlobal().info("init Job Manager");
         pendingJobs = DBUtil.loadJobs();
         for(Job job: pendingJobs) {
             MessageManager.addListeningPlayer(job.getOwner());

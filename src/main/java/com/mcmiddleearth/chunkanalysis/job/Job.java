@@ -19,7 +19,6 @@
 package com.mcmiddleearth.chunkanalysis.job;
 
 import com.mcmiddleearth.chunkanalysis.ChunkAnalysis;
-import com.mcmiddleearth.chunkanalysis.MessageManager;
 import com.mcmiddleearth.chunkanalysis.util.DevUtil;
 import com.mcmiddleearth.chunkanalysis.job.action.JobAction;
 import com.mcmiddleearth.chunkanalysis.util.DBUtil;
@@ -43,6 +42,10 @@ import org.bukkit.util.Vector;
  * @author Eriol_Eandur
  */
 public abstract class Job {
+    
+    @Getter
+    @Setter
+    private boolean prepared = true;
     
     @Getter
     private final int id;
@@ -74,8 +77,12 @@ public abstract class Job {
     
     private long finishTime = -1;
     
-    protected boolean taskCancelled;
+    
+    private boolean taskWorking = false;    //flag if task is currently working
+    protected boolean taskCancelled;        //flag to cancel task during working in a chunk
+    protected boolean saveProgress = false; //flag if the progress should be saved on next task cancel
 
+    
     @Getter
     protected JobAction action;
     
@@ -114,6 +121,7 @@ public abstract class Job {
             jobTask = new BukkitRunnable() {
                 @Override
                 public void run() {
+                    taskWorking = true;
                     DevUtil.log(6,"Starting job with size: "+taskSize);
                     int taskSizeInt = Math.round(taskSize);
                     if(taskSizeInt>0) {
@@ -124,6 +132,7 @@ public abstract class Job {
                         cancel();
                         clearJobData();
                     }
+                    taskWorking = false;
                 }
             }.runTaskTimer(ChunkAnalysis.getInstance(), 0, 1);
         }
@@ -131,12 +140,42 @@ public abstract class Job {
     
     //protected abstract BukkitRunnable createJobTask(int askSize);
     
-    public void stopTask() {
-        if(jobTask!=null && !taskCancelled) {
+    public void stopTask(boolean save) {
+        if(isTaskPending() && !taskCancelled) {//jobTask!=null && !taskCancelled) {
             taskCancelled = true;
             jobTask.cancel();
+            if(save) {
+                if(taskWorking) {
+                    DevUtil.log("save during working in chunk scheduled");
+                    saveProgress = true;
+                } else {
+                    saveProgress();
+                }
+            }
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    handlePendingUpdates();
+                }
+            }.runTaskLater(ChunkAnalysis.getInstance(), 1);
         }
     }
+    
+    public void saveProgress(){//int blockX, int blockY, int blockZ, boolean ignoreCancel) {
+        //if(!taskCancelled || ignoreCancel) {
+            DevUtil.log("save progress");
+            DBUtil.logChunk(this, currentChunk.getBlockX(),
+                                  currentChunk.getBlockZ(), 
+                                  currentBlock.getBlockX(),
+                                  currentBlock.getBlockY(),
+                                  currentBlock.getBlockZ(), 
+                                  getAction().getProcessedBlocks(),
+                                  getAction().getFoundBlocks());
+            this.action.saveResults(getId());
+        //}
+    }
+    
+    protected void handlePendingUpdates() {};
     
     public void clearJobData() {
         DBUtil.deleteJob(this);
@@ -160,10 +199,15 @@ public abstract class Job {
             if(percentage.contains(".") && percentage.length()>percentage.indexOf(".")+3) {
                 percentage = percentage.substring(0,percentage.indexOf(".")+3);
             }
-            return ChatColor.GREEN+percentage+"%"
-                    +ChatColor.AQUA+" done. Working at "+ChatColor.GREEN
-                    + (currentChunk.getBlockX()*16)+" "+(currentChunk.getBlockZ()*16)
-                    +ChatColor.AQUA+". ";
+            if(isPrepared()) {
+                return ChatColor.GREEN+percentage+"%"
+                        +ChatColor.AQUA+" done. Working at "+ChatColor.GREEN
+                        + (currentChunk.getBlockX()*16)+" "+(currentChunk.getBlockZ()*16)
+                        +ChatColor.AQUA+". ";
+            } else {
+                return ChatColor.AQUA+"preparing...";
+                
+            }
         //}
     }
     

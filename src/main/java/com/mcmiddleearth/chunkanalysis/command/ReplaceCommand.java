@@ -19,7 +19,7 @@
 package com.mcmiddleearth.chunkanalysis.command;
 
 import com.mcmiddleearth.chunkanalysis.job.action.JobAction;
-import com.mcmiddleearth.chunkanalysis.job.action.JobActionReplace;
+import com.mcmiddleearth.chunkanalysis.job.action.JobActionQuickReplace;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -63,7 +63,8 @@ public class ReplaceCommand extends AbstractStartCommand {
                 }
             }
         }
-        return new JobActionReplace(searchDataList.toArray(new int[0][0]),replaceDataList.toArray(new int[0][0]));
+//Logger.getGlobal().info("Arguments analysed getAction ReplaceCommand");
+        return new JobActionQuickReplace(searchDataList.toArray(new int[0][0]),replaceDataList.toArray(new int[0][0]));
     }
 
 }

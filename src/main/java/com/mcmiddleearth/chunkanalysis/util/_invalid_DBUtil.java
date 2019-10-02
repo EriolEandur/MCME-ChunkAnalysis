@@ -40,7 +40,7 @@ import org.mariadb.jdbc.MySQLDataSource;
  *
  * @author Eriol_Eandur
  */
-public class DBUtil {
+public class _invalid_DBUtil {
 
     private static String dbUser;
     private static String dbPassword;
@@ -82,43 +82,49 @@ public class DBUtil {
         
     public static synchronized void logJobCreation(final Job job) {
         if(isConnected()) {
-            try {
-                logJobCreate.setInt(1,job.getId());
-                logJobCreate.setString(2,job.getOwner().toString());
-                logJobCreate.setString(3,job.getClass().getName());
-                logJobCreate.setString(4,job.getAction().getClass().getName());
-                logJobCreate.setString(5,job.getWorld().getName());
-                executeUpdate(logJobCreate);
-                Vector[] coords = job.getCoords();
-                String coordData = "";
-                for(int i=0;i<coords.length;i++) {
-                    Vector coord = coords[i];
-                    coordData = coordData + coord.getBlockX()+" "
-                                          + coord.getBlockY()+" "
-                                          + coord.getBlockZ()+" ";
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    try {
+                        logJobCreate.setInt(1,job.getId());
+                        logJobCreate.setString(2,job.getOwner().toString());
+                        logJobCreate.setString(3,job.getClass().getName());
+                        logJobCreate.setString(4,job.getAction().getClass().getName());
+                        logJobCreate.setString(5,job.getWorld().getName());
+                        executeUpdate(logJobCreate);
+                        Vector[] coords = job.getCoords();
+                        for(int i=0;i<coords.length;i++) {
+                            Vector coord = coords[i];
+                            logJobCoord.setInt(1, coord.getBlockX());
+                            logJobCoord.setInt(2, coord.getBlockY());
+                            logJobCoord.setInt(3, coord.getBlockZ());
+                            logJobCoord.setInt(4, job.getId());
+                            logJobCoord.setInt(5, i);
+                            executeUpdate(logJobCoord);
+                        }
+                        for(int i=0;i<job.getAction().getBlockIds().length;i++) {
+                            int[] blockId = job.getAction().getBlockIds()[i];
+                            logBlockIds.setInt(1, blockId[0]);
+                            logBlockIds.setInt(2, blockId[1]);
+                            logBlockIds.setInt(3, job.getId());
+                            logBlockIds.setInt(4, i);
+                            logBlockIds.setInt(5, 0);//blockId[2]);
+                            executeUpdate(logBlockIds);
+                        }
+                    } catch (SQLException ex) {
+                        connected = false;
+                        Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                    } finally {
+                        job.setPrepared(true);
+                    }
                 }
-                logJobCoord.setInt(1, job.getId());
-                logJobCoord.setString(2, coordData);
-                executeUpdate(logJobCoord);
-                String blockIdData = "";
-                for(int i=0;i<job.getAction().getBlockIds().length;i++) {
-                    int[] blockId = job.getAction().getBlockIds()[i];
-                    blockIdData = blockIdData + blockId[0] + " "
-                                              + blockId[1] + " "
-                                              + "0 ";
-                }
-                logBlockIds.setInt(1, job.getId());
-                logBlockIds.setString(2, blockIdData);
-//Logger.getGlobal().info(blockIdData);
-                executeUpdate(logBlockIds);
-            } catch (SQLException ex) {
-                connected = false;
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            }.runTaskAsynchronously(ChunkAnalysis.getInstance());
+        } else {
+            job.setPrepared(true);
         }
     }
 
-    public static synchronized void log_Block(Job job, int x, int y, int z, long processed, long found) {
+    public static synchronized void logBlock(Job job, int x, int y, int z, long processed, long found) {
         if(isConnected()) {
             try {
                 logBlock.setInt(1,x);
@@ -130,7 +136,7 @@ public class DBUtil {
                 executeUpdate(logBlock);
             } catch (SQLException ex) {
                 connected = false;
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -148,10 +154,9 @@ public class DBUtil {
                 logChunk.setLong(7, found);
                 logChunk.setInt(8,job.getId());
                 executeUpdate(logChunk);
-//Logger.getGlobal().info("logChunk: "+chunkX+" "+chunkZ+" "+blockX+" "+blockY+" "+blockZ);
             } catch (SQLException ex) {
                 connected = false;
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -164,7 +169,7 @@ public class DBUtil {
                 executeUpdate(logJobStart);
             } catch (SQLException ex) {
                 connected = false;
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -177,7 +182,7 @@ public class DBUtil {
                 logJobResultUpdate.setInt(3, index);
                 executeUpdate(logJobResultUpdate);
             } catch (SQLException ex) {
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -193,7 +198,7 @@ public class DBUtil {
                 executeUpdate(deleteJobBlocks);
             } catch (SQLException ex) {
                 connected = false;
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -211,25 +216,20 @@ public class DBUtil {
                 return jobIds;
             } catch (SQLException ex) {
                 connected = false;
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
         return new int[0];
     }
     
     public static synchronized List<Job> loadJobs() {
-//Logger.getGlobal().info("Load jobs");
         if(isConnected()) {
-//Logger.getGlobal().info("1");
             try {
-//Logger.getGlobal().info("2");
                 
                 ResultSet jobData = getJobs.executeQuery();
                 if(jobData.first()) {
-//Logger.getGlobal().info("3");
                     List<Job> jobs = new ArrayList<>();
                     while(!jobData.isAfterLast()) {
-//Logger.getGlobal().info("4");
                         String type = jobData.getString("jobType");
                         String actionType = jobData.getString("actionType");
                         String world = jobData.getString("world");
@@ -240,31 +240,25 @@ public class DBUtil {
                         Vector currentBlock = new Vector(jobData.getInt("x"),
                                                          jobData.getInt("y"),
                                                          jobData.getInt("z"));
-//Logger.getGlobal().info("Starting: "+currentChunk.getBlockX()+" "+currentChunk.getBlockZ()+" "+
-//                                     currentBlock.getBlockX()+" "+currentBlock.getBlockY()+" "+
-//                                      currentBlock.getBlockZ());
                         getJobCoords.setInt(1, id);
-                        ResultSet coordResult = getJobCoords.executeQuery();
-                        coordResult.first();
-                        String[] coordData = coordResult.getString("data").split(" ");
-                        Vector[] jobCoords = new Vector[coordData.length/3];
-//Logger.getGlobal().info(coordResult.getString("data"));
-                        for(int i = 0; i<jobCoords.length;i++) {
-                            jobCoords[i] = new Vector(Integer.parseInt(coordData[i*3]),
-                                                      Integer.parseInt(coordData[i*3+1]),
-                                                      Integer.parseInt(coordData[i*3+2]));
+                        ResultSet coordData = getJobCoords.executeQuery();
+                        coordData.last();
+                        Vector[] jobCoords = new Vector[coordData.getRow()];
+                        for(int i = 1; i<=jobCoords.length;i++) {
+                            coordData.absolute(i);
+                            jobCoords[coordData.getInt("coordID")] = new Vector(coordData.getInt("x"),
+                                                                        coordData.getInt("y"),
+                                                                        coordData.getInt("z"));
                         }
                         getBlockIds.setInt(1, id);
-                        ResultSet blockResult = getBlockIds.executeQuery();
-                        blockResult.first();
-                        String[] blockData = blockResult.getString("data").split(" ");
-                        int[][] blockIds = new int[blockData.length/3][];
-//Logger.getGlobal().info(blockResult.getString("data"));
-                        for(int i = 0; i<blockIds.length;i++) {
-                            blockIds[i] = new int[]{Integer.parseInt(blockData[i*3]),
-                                                    Integer.parseInt(blockData[i*3+1]),
-                                                    Integer.parseInt(blockData[i*3+2])};
-//Logger.getGlobal().info(""+blockIds[i]);                            
+                        ResultSet blockData = getBlockIds.executeQuery();
+                        blockData.last();
+                        int[][] blockIds = new int[blockData.getRow()][];
+                        for(int i = 1; i<=blockIds.length;i++) {
+                            blockData.absolute(i);
+                            blockIds[blockData.getInt("index")] = new int[]{blockData.getInt("ID"),
+                                                                            blockData.getInt("DV"),
+                                                                            blockData.getInt("counter")};
                         }
                         UUID uuid = UUID.fromString(jobData.getString("owner"));
                         Timestamp stamp = jobData.getTimestamp("startTime");
@@ -292,7 +286,7 @@ public class DBUtil {
                             jobs.add(job);
                         } catch (IllegalAccessException | InvocationTargetException | 
                                  ClassNotFoundException | NoSuchMethodException | SecurityException ex) {
-                            Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                            Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
                         }
                         jobData.next();
                     }
@@ -300,7 +294,7 @@ public class DBUtil {
                 }
             } catch (SQLException ex) {
                 connected = false;
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
         return new ArrayList<>();
@@ -320,7 +314,7 @@ public class DBUtil {
                 logMessage.setString(2, message);
                 executeUpdate(logMessage);
             } catch (SQLException ex) {
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -346,7 +340,7 @@ public class DBUtil {
                     }
                 }
             } catch (SQLException ex) {
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
         return messages;
@@ -359,7 +353,7 @@ public class DBUtil {
                                                             -(storagePeriod*24*3600*1000)));
                 executeUpdate(deleteMessages);
             } catch (SQLException ex) {
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }
@@ -386,10 +380,8 @@ public class DBUtil {
             checkTables();
             
             logJobCreate = dbConnection.prepareStatement("INSERT INTO jobs VALUES (?,?,?,0,0,0,NULL,NULL,0,0,0,?,?)");
-            //logJobCoord = dbConnection.prepareStatement("INSERT INTO jobcoords VALUES (?,?,?,?,?)");
-            //logBlockIds = dbConnection.prepareStatement("INSERT INTO blockid VALUES (?,?,?,?,?)");
-            logJobCoord = dbConnection.prepareStatement("INSERT INTO jobcoords VALUES (?,?)");
-            logBlockIds = dbConnection.prepareStatement("INSERT INTO blockid VALUES (?,?)");
+            logJobCoord = dbConnection.prepareStatement("INSERT INTO jobcoords VALUES (?,?,?,?,?)");
+            logBlockIds = dbConnection.prepareStatement("INSERT INTO blockid VALUES (?,?,?,?,?)");
             logJobStart = dbConnection.prepareStatement("UPDATE jobs SET startTime = ? WHERE jobID = ?");
             logJobResultUpdate = dbConnection.prepareStatement("UPDATE blockid SET counter = ?"
                                                                +" WHERE jobID = ? AND `index` = ?");
@@ -403,16 +395,14 @@ public class DBUtil {
             deleteJobBlocks = dbConnection.prepareStatement("DELETE FROM blockid WHERE jobID = ?");
             deleteMessages = dbConnection.prepareStatement("DELETE FROM messages WHERE time < ?");
             getJobs = dbConnection.prepareStatement("SELECT * FROM jobs");
-            //getJobCoords = dbConnection.prepareStatement("SELECT * FROM jobcoords WHERE jobID = ?");
-            //getBlockIds = dbConnection.prepareStatement("SELECT * FROM blockid WHERE jobID = ?");
-            getJobCoords = dbConnection.prepareStatement("SELECT data FROM jobcoords WHERE jobID = ?");
-            getBlockIds = dbConnection.prepareStatement("SELECT data FROM blockid WHERE jobID = ?");
+            getJobCoords = dbConnection.prepareStatement("SELECT * FROM jobcoords WHERE jobID = ?");
+            getBlockIds = dbConnection.prepareStatement("SELECT * FROM blockid WHERE jobID = ?");
             getJobIds = dbConnection.prepareStatement("SELECT jobID FROM jobs");
             getMessages = dbConnection.prepareStatement("SELECT * FROM messages ORDER BY time DESC, message DESC");
             connected = true;
         } catch (SQLException ex) {
             connected = false;
-            Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, "Connection to DB failed", ex);
+            Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, "Connection to DB failed", ex);
         }
     }
     
@@ -426,9 +416,11 @@ public class DBUtil {
                                               +"x SMALLINT(6), y SMALLINT(6), z SMALLINT(6), "
                                               +"actionType VARCHAR(150), world VARCHAR(50))");
         dbConnection.createStatement().execute("CREATE TABLE IF NOT EXISTS blockid "
-                                              +"(jobID SMALLINT(6), data LONGTEXT)");
+                                              +"(ID SMALLINT(6), DV TINYINT(4), jobID SMALLINT(6),"
+                                              +"`index` SMALLINT(6), counter INT(11) DEFAULT 0)");
         dbConnection.createStatement().execute("CREATE TABLE IF NOT EXISTS jobcoords "
-                                              +"(jobID INT(11), data LONGTEXT)");
+                                              +"(x INT(11), y INT(11), z INT(11),"
+                                              +"jobID INT(11), coordID INT(11))");
         dbConnection.createStatement().execute("CREATE TABLE IF NOT EXISTS messages "
                                               +"(time TIMESTAMP NULL, message TEXT)");
     }
@@ -440,7 +432,7 @@ public class DBUtil {
                     try {
                         statement.executeUpdate();
                     } catch (SQLException ex) {
-                        Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                        Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
             }.runTaskAsynchronously(ChunkAnalysis.getInstance());
@@ -448,7 +440,7 @@ public class DBUtil {
             try {
                 statement.executeUpdate();
             } catch (SQLException ex) {
-                Logger.getLogger(DBUtil.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(_invalid_DBUtil.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
     }

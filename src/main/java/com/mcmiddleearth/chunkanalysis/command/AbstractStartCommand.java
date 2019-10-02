@@ -22,7 +22,6 @@ import com.mcmiddleearth.architect.PluginData;
 import com.mcmiddleearth.chunkanalysis.ChunkAnalysis;
 import com.mcmiddleearth.chunkanalysis.JobManager;
 import com.mcmiddleearth.chunkanalysis.MessageManager;
-import com.mcmiddleearth.chunkanalysis.job.CuboidJob;
 import com.mcmiddleearth.chunkanalysis.job.PolyJob;
 import com.mcmiddleearth.chunkanalysis.job.action.JobAction;
 import com.mcmiddleearth.chunkanalysis.util.DBUtil;
@@ -31,12 +30,15 @@ import com.sk89q.worldedit.BlockVector2D;
 import com.sk89q.worldedit.bukkit.selections.CuboidSelection;
 import com.sk89q.worldedit.bukkit.selections.Polygonal2DSelection;
 import com.sk89q.worldedit.bukkit.selections.Selection;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -59,15 +61,31 @@ public abstract class AbstractStartCommand extends AbstractCommand {
     
     @Override
     protected void execute(CommandSender cs, String... argz) {
+//Logger.getGlobal().info("excecute AbstactStartCommand");
         List<String> args = Arrays.asList(argz);
+        if(args.contains("-f")) {
+            int index = args.indexOf("-f");
+            String filename = "input.txt";
+            if(index+1<args.size()) {
+                filename = args.get(index+1);
+            }
+            String input = getInputFromFile(filename);
+            args = new ArrayList(args);
+            args.addAll(Arrays.asList(input.split(" ")));
+//Logger.getGlobal().info("file input added AbstactStartCommand");
+            
+            /*for(String str: data) {
+                args.add(str);
+            }*/
+        }
         if(!DBUtil.checkConnection() && !args.contains("-o")) {
             ChunkAnalysis.getMessageUtil().sendErrorMessage(cs, "No database connection. If the server crashes while the job is running it will not be continued. To start the job anyways at '-o' argument at own risk.");
             return;
         }
-        if(args.contains("-m") && args.contains("-p")){
+        /*if(args.contains("-m") && args.contains("-p")){
             ChunkAnalysis.getMessageUtil().sendErrorMessage(cs, "Cannot have both map and pack");
             return;
-        }
+        }*/
         if(!args.contains("-m") && !args.contains("-p") && !(cs instanceof Player)){
             ChunkAnalysis.getMessageUtil().sendErrorMessage(cs, "Cannot use selection with console!");
             return;
@@ -88,29 +106,25 @@ public abstract class AbstractStartCommand extends AbstractCommand {
                     return;
                 }
                 Map<World,List<Polygonal2DSelection>> areas = getPackAreas(packUrl);
+                World map = null;
+                if(args.contains("-m") ){
+                    map=getMap(cs,args);
+                    if(map==null) {
+                        return;
+                    }
+                }
                 for(World world: areas.keySet()) {
-                    startPolyJob(areas.get(world), (Player) cs, args);
+                    if(map==null || map.equals(world)) {
+                        startPolyJob(areas.get(world), (Player) cs, args);
+                    }
                 }
                 return;
             }
         }
         if(args.contains("-m")) {
-            int i = args.indexOf("-m");
-            World map = null;
-            if(args.size()>=i+2) {
-                map = Bukkit.getWorld(args.get(i+1));
-                if(map==null) {
-                    ChunkAnalysis.getMessageUtil().sendErrorMessage(cs, "World not found.");
-                    return;
-                }
-            }
+            World map = getMap(cs, args);
             if(map==null) {
-                if(cs instanceof Player) {
-                    map = ((Player) cs).getWorld();
-                } else {
-                    ChunkAnalysis.getMessageUtil().sendErrorMessage(cs, "You need to specify the world name when using argument '-m' from console.");
-                    return;
-                }
+                return;
             }
             Vector minChunk = ((ChunkAnalysis)ChunkAnalysis.getInstance()).getMinBlock(map);
             Vector maxChunk = ((ChunkAnalysis)ChunkAnalysis.getInstance()).getMaxBlock(map);
@@ -124,8 +138,9 @@ public abstract class AbstractStartCommand extends AbstractCommand {
                            ((Player)cs), args);
             return;
         }
-        final Selection sel = ChunkAnalysis.getWorldEdit().getSelection((Player) cs);
+        Selection sel = ChunkAnalysis.getWorldEdit().getSelection((Player) cs);
         if(sel instanceof CuboidSelection) {
+//Logger.getGlobal().info("startCuboidJob AbstactStartCommand");
             startCuboidJob((CuboidSelection)sel, ((Player)cs), args);
         } else if(sel instanceof Polygonal2DSelection) {
             List<Polygonal2DSelection> area = new ArrayList<>();
@@ -134,15 +149,55 @@ public abstract class AbstractStartCommand extends AbstractCommand {
         }
     }
 
-    private void startCuboidJob(CuboidSelection selection, Player player, List<String> args) {
+    private void startCuboidJob(CuboidSelection sel, Player player, List<String> args) {
+        List<BlockVector2D> points= new ArrayList<>();
+        points.add(new BlockVector2D(sel.getMinimumPoint().getBlockX(),
+                                     sel.getMinimumPoint().getBlockZ()));
+        points.add(new BlockVector2D(sel.getMinimumPoint().getBlockX(),
+                                     sel.getMaximumPoint().getBlockZ()));
+        points.add(new BlockVector2D(sel.getMaximumPoint().getBlockX(),
+                                     sel.getMaximumPoint().getBlockZ()));
+        points.add(new BlockVector2D(sel.getMaximumPoint().getBlockX(),
+                                     sel.getMinimumPoint().getBlockZ()));
+        Polygonal2DSelection selection = new Polygonal2DSelection(sel.getWorld(),
+                                       points,sel.getMinimumPoint().getBlockY(),
+                                              sel.getMaximumPoint().getBlockY());
+        List<Polygonal2DSelection> regions = new ArrayList<>();
+        regions.add(selection);
+        startPolyJob(regions, player, args);
+        /*
+Logger.getGlobal().info("get action startCuboidJob");
         JobAction action = getAction(args);
+Logger.getGlobal().info("action constructed startCuboidJob");
         if(action!=null) {
             JobManager.addJob(new CuboidJob(player.getUniqueId(),selection,action));
+Logger.getGlobal().info("job added startCuboidJob");
             MessageManager.addListeningPlayer(player.getUniqueId());
             ChunkAnalysis.getMessageUtil().sendInfoMessage(player, "Cuboid job queued.");
         } else {
             sendInvalidActionArguments(player);
+        }*/
+    }
+    
+    private World getMap(CommandSender cs, List<String> args) {
+        int i = args.indexOf("-m");
+        World map = null;
+        if(args.size()>=i+2) {
+            map = Bukkit.getWorld(args.get(i+1));
+            if(map==null) {
+                ChunkAnalysis.getMessageUtil().sendErrorMessage(cs, "World not found.");
+                return null;
+            }
         }
+        if(map==null) {
+            if(cs instanceof Player) {
+                map = ((Player) cs).getWorld();
+            } else {
+                ChunkAnalysis.getMessageUtil().sendErrorMessage(cs, "You need to specify the world name when using argument '-m' from console.");
+                return null;
+            }
+        }
+        return map;
     }
     
     private void startPolyJob(List<Polygonal2DSelection> selections, Player player, List<String> args) {
@@ -174,8 +229,17 @@ public abstract class AbstractStartCommand extends AbstractCommand {
                 return -1;
             }
         } else {
-            return -1;
+            return 0;
         }
+    }
+
+    protected String getInputFromFile(String filename) {
+        try(Scanner fr = new Scanner(new File(ChunkAnalysis.getInstance().getDataFolder(),filename))) {
+            return fr.nextLine();
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(AbstractStartCommand.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return "";
     }
 
     private Map<World,List<Polygonal2DSelection>> getPackAreas(String packUrl) {
