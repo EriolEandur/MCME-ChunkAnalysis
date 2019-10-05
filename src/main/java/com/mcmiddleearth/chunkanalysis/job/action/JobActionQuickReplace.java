@@ -25,7 +25,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 
@@ -34,6 +33,10 @@ import org.bukkit.block.BlockState;
  * @author Eriol_Eandur
  */
 public class JobActionQuickReplace extends JobAction {
+    
+    private final boolean replaceChorus;
+    private final boolean replaceHalfDoors;
+    private final boolean replaceHalfBeds;
     
     private final int[][] searchBlocks;
     
@@ -44,10 +47,18 @@ public class JobActionQuickReplace extends JobAction {
     private Set<BlockState> pendingUpdates = new HashSet<>();
     //private Set<Chunk> pendingChunks = new HashSet<>();
     
-    public JobActionQuickReplace(int[][] searchBlocks, int[][] replaceBlocks) {
+    public JobActionQuickReplace(int[][] searchBlocks, int[][] replaceBlocks, 
+                                 boolean replaceChorus, boolean replaceDoors,
+                                 boolean replaceBeds) {
         super(0, 0);
         this.searchBlocks=searchBlocks;
         this.replaceBlocks=replaceBlocks;
+        this.replaceChorus = replaceChorus;
+        this.replaceHalfDoors = replaceDoors;
+        this.replaceHalfBeds = replaceBeds;
+        Logger.getGlobal().info("Replacing chorus plants: "+replaceChorus);
+        Logger.getGlobal().info("Replacing half doors: "+replaceDoors);
+        Logger.getGlobal().info("Replacing half beds: "+replaceBeds);
         createReplacements();
     }
     
@@ -62,6 +73,9 @@ public class JobActionQuickReplace extends JobAction {
         System.arraycopy(blockData, 0, searchBlocks, 0, blockData.length/2);
         System.arraycopy(blockData, blockData.length/2, replaceBlocks, 0, blockData.length/2);
         DevUtil.log("Search for "+ searchBlocks.length+" blocks ");
+        replaceChorus = false;
+        replaceHalfDoors = false;
+        replaceHalfBeds = false;
         createReplacements();
     }
     
@@ -101,6 +115,15 @@ public class JobActionQuickReplace extends JobAction {
                 Logger.getGlobal().info("NULL: "+state.getX()+" "+state.getY()+" "+state.getZ()+" "+state.getType()+" "+state.getRawData());
             }
             foundBlocks++;
+        }
+        if(replaceChorus) {
+            new JobChorusPlantReplace().execute(block);
+        }
+        if(replaceHalfDoors) {
+            new JobHalfDoorReplace().execute(block);
+        }
+        if(replaceHalfBeds) {
+            new JobHalfBedReplace().execute(block);
         }
     }
     

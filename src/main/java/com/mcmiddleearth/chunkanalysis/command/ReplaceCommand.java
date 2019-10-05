@@ -64,7 +64,11 @@ public class ReplaceCommand extends AbstractStartCommand {
             }
         }
 //Logger.getGlobal().info("Arguments analysed getAction ReplaceCommand");
-        return new JobActionQuickReplace(searchDataList.toArray(new int[0][0]),replaceDataList.toArray(new int[0][0]));
+        return new JobActionQuickReplace(searchDataList.toArray(new int[0][0]),
+                                         replaceDataList.toArray(new int[0][0]),
+                                         args.contains("-chorus"),
+                                         args.contains("-doors"),
+                                         args.contains("-beds"));
     }
 
 }
